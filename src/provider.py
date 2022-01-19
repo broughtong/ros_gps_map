@@ -58,6 +58,4 @@ if __name__ == '__main__':
     coords = (50.075538, 14.437800)
     for i in range(-1, 20):
         getMapImage(*coords, i)
-        lcoords = convertCoords(*coords, i)
-        image = downloadMapImage(lcoords[0], *lcoords[1:])
 

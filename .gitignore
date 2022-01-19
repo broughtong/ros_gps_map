@@ -2,3 +2,4 @@
 src/mapCache
 *.swp
 *.swo
+src/__pycache__/
