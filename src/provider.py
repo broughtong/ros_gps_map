@@ -17,6 +17,17 @@ def convertCoords(latitude, longitude, zoom):
     
     return x, y, zoom
 
+def getImageCoords(latitude, longitude, zoom):
+
+    x = (longitude + 180) / 360 * (2**zoom)
+    y = (1 - math.asinh(math.tan(math.radians(latitude))) / math.pi) / 2 * (2**zoom)
+
+    imgCoords = convertCoords(latitude, longitude, zoom)
+    x -= imgCoords[0]
+    y -= imgCoords[1]
+
+    return x, y, zoom
+
 def downloadMapImage(x, y, z):
 
     url = urlTemplate.format(x=x, y=y, z=z)

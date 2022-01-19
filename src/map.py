@@ -36,7 +36,11 @@ def updateMap():
 
     dim = img.shape[0]
 
-    img = cv2.circle(img, (dim//2, dim//2), 5, (0, 0, 255), -1, lineType=cv2.LINE_AA)
+    location = list(provider.getImageCoords(lat, lon, zoom))
+    location[0] = int(location[0]*dim)
+    location[1] = int(location[1]*dim)
+
+    img = cv2.circle(img, (location[0], location[1]), 5, (0, 0, 255), -1, lineType=cv2.LINE_AA)
 
     img = br.cv2_to_imgmsg(img, encoding="passthrough")
     pub.publish(img)
