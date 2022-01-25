@@ -11,15 +11,37 @@ from ros_gps_map.cfg import mapConfig
 br = CvBridge()  
 gpsMsg = None
 zoom = 0
+tileRadius = 1
+hadFirstFix = False
 
 def gpsCallback(msg):
-    global gpsMsg
+    global gpsMsg, hadFirstFix
     gpsMsg = msg
+
+    if hadFirstFix == False:
+        hadFirstFix = True
+        provider.cacheImages(msg.latitude, msg.longitude)
 
 def dynamicCallback(config, level):
     global zoom
     zoom = config["Zoom"]
     return config
+
+def blitImg(baseImg, img, x, y):
+
+    drawLocX = x
+    drawLocY = y
+    if x > 0:
+        img = img[:, :-x]
+    if y > 0:
+        img = img[:-y, :]
+    if x < 0:
+        img = img[:, -x:]
+        drawLocX = 0
+    if y < 0:
+        img = img[-y:, :]
+        drawLocY = 0
+    baseImg[drawLocY:drawLocY+img.shape[0], drawLocX:drawLocX+img.shape[1]] = img
 
 def updateMap():
     global gpsMsg
@@ -30,6 +52,17 @@ def updateMap():
 
     lat = gpsMsg.latitude
     lon = gpsMsg.longitude
+    return
+
+    baseImg = np.zeros((dim, dim, 3), np.uint8) 
+
+    mapCoords = provider.convertCoords(lat, lon, zoom)
+
+    tiles = np.empty(((2*tileRadius)+1, (2*tileRadius) + 1))
+    tiles
+
+
+     
 
     img = provider.getMapImage(lat, lon, zoom)
     if img is None:
@@ -38,34 +71,19 @@ def updateMap():
 
     dim = img.shape[0]
 
-    baseImg = np.zeros((dim, dim, 3), np.uint8) 
     
-    location = list(provider.getImageCoords(lat, lon, zoom))
+    location = list(provider.getGPSCoordsPixelOffset(lat, lon, zoom))
     location[0] = int(location[0]*dim)
     location[1] = int(location[1]*dim)
 
     centre = (dim//2, dim//2)
     diff = (centre[0] - location[0], centre[1] - location[1])
 
-    offsetX = diff[0]
-    offsetY = diff[1]
+    blitImg(baseImg, img, diff[0], diff[1])
 
-    drawLocX = offsetX
-    drawLocY = offsetY
-    if offsetX > 0:
-        img = img[:, :-offsetX]
-    if offsetY > 0:
-        img = img[:-offsetY, :]
-    if offsetX < 0:
-        img = img[:, -offsetX:]
-        drawLocX = 0
-    if offsetY < 0:
-        img = img[-offsetY:, :]
-        drawLocY = 0
-    baseImg[drawLocY:drawLocY+img.shape[0], drawLocX:drawLocX+img.shape[1]] = img
+
 
     img = cv2.circle(baseImg, centre, 5, (0, 0, 255), -1, lineType=cv2.LINE_AA)
-    #img = cv2.circle(img, (location[0], location[1]), 5, (0, 0, 255), -1, lineType=cv2.LINE_AA)
 
     img = br.cv2_to_imgmsg(img, encoding="passthrough")
     pub.publish(img)

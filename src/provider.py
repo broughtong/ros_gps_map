@@ -7,7 +7,7 @@ import urllib
 from skimage import io
 
 cacheFolder = "./mapCache"
-urlTemplate = "https://tiles.wmflabs.org/osm-no-labels/{z}/{x}/{y}.png"
+urlTemplate = "http://tile.memomaps.de/tilegen/{z}/{x}/{y}.png"
 urlFolder = urlTemplate.replace("/", "_")#.replace("\", "-")
 
 def convertCoords(latitude, longitude, zoom):
@@ -17,7 +17,18 @@ def convertCoords(latitude, longitude, zoom):
     
     return x, y, zoom
 
-def getImageCoords(latitude, longitude, zoom):
+def isTileCoordinateValid(x, y, z):
+    if x < 0 or y < 0 or z < 0 or z > 20:
+        return False
+    maxX = 2**z
+    if x >= maxX:
+        return False
+    maxY = int((2**z) / 2)
+    if y > maxY:
+        return False
+    return True
+
+def getGPSCoordsPixelOffset(latitude, longitude, zoom):
 
     x = (longitude + 180) / 360 * (2**zoom)
     y = (1 - math.asinh(math.tan(math.radians(latitude))) / math.pi) / 2 * (2**zoom)
@@ -42,31 +53,49 @@ def downloadMapImage(x, y, z):
 
     return image
 
-def getMapImage(lat, lon, z):
+def getMapImage(tileX, tileY, tileZ):
 
     cachePath = os.path.join(cacheFolder, urlFolder)
-    if not os.path.exists(cacheFolder):
-        os.mkdir(cacheFolder)
-    if not os.path.exists(cachePath):
-        os.mkdir(cachePath)
+    os.makedirs(cachePath, exist_ok=True)
 
-    mapCoords = convertCoords(lat, lon, z)
-    filename = os.path.join(cachePath, "%i-%i-%i.png" % mapCoords)
+    filename = os.path.join(cachePath, "%i-%i-%i.png" % (tileX, tileY, tileZ))
 
     image = None
     if os.path.isfile(filename):
         print("Cache hit for %s" % filename)
         image = cv2.imread(filename)
     else:
-        image = downloadMapImage(*mapCoords)
+        if isTileCoordinateValid(tileX, tileY, tileZ) == False:
+            return None
+        image = downloadMapImage(tileX, tileY, tileZ)
         if image is None:
             return None
         cv2.imwrite(filename, image)
     return image
 
+def cacheImages(lat, lon):
+
+    threads = []
+    for i in range(20):
+        tileCoords = convertCoords(lat, lon, i)
+
+        threads.append(threading.Thread(target=getMapImage, args=(tileCoords[0]-1, tileCoords[1]-1, tileCoords[2])))
+        threads.append(threading.Thread(target=getMapImage, args=(tileCoords[0]-1, tileCoords[1], tileCoords[2])))
+        threads.append(threading.Thread(target=getMapImage, args=(tileCoords[0]-1, tileCoords[1]+1, tileCoords[2])))
+        threads.append(threading.Thread(target=getMapImage, args=(tileCoords[0], tileCoords[1]-1, tileCoords[2])))
+        threads.append(threading.Thread(target=getMapImage, args=(tileCoords[0], tileCoords[1], tileCoords[2])))
+        threads.append(threading.Thread(target=getMapImage, args=(tileCoords[0], tileCoords[1]+1, tileCoords[2])))
+        threads.append(threading.Thread(target=getMapImage, args=(tileCoords[0]+1, tileCoords[1]-1, tileCoords[2])))
+        threads.append(threading.Thread(target=getMapImage, args=(tileCoords[0]+1, tileCoords[1], tileCoords[2])))
+        threads.append(threading.Thread(target=getMapImage, args=(tileCoords[0]+1, tileCoords[1]+1, tileCoords[2])))
+
+    for t in threads:
+        t.start()
+
 if __name__ == '__main__':
 
     coords = (50.075538, 14.437800)
     for i in range(-1, 20):
-        getMapImage(*coords, i)
+        tileCoords = convertCoords(*coords, i)
+        getMapImage(*tileCoords)
 
