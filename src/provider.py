@@ -91,6 +91,8 @@ def cacheImages(lat, lon):
 
     for t in threads:
         t.start()
+    for t in threads:
+        t.join()
 
 if __name__ == '__main__':
 
